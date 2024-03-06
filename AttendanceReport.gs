@@ -3,22 +3,44 @@ const ACCESS_TOKEN = PropertiesService.getScriptProperties().getProperty("access
 let startLimit = 0;
 let maxResultsLimit = 200;
 let totalLimit = 0; 
+let alreadyCallVal = false;
 
-let currentDate = new Date();
-// Calculate start date and end date dynamically based on the current date
-let oneDayBefore = new Date(currentDate);
-oneDayBefore.setDate(oneDayBefore.getDate() - 1);
-
-let oneMonthBefore = new Date(oneDayBefore);
-oneMonthBefore.setMonth(oneMonthBefore.getMonth() - 1);
-
-let formattedStartDate = new Date(oneMonthBefore);
-let formattedEndDate = new Date(oneDayBefore);
-
-let startDate = getFormattedDate(formattedStartDate);
-let endDate = getFormattedDate(formattedEndDate);
-Logger.log(endDate);
-function getAttendanceReport() {
+// Function for generating attendance report
+function getAttendanceReport(month) {
+  givenMonth = (month) ? month : givenMonth;
+  let datesObj = getFirstAndLastDateOfMonth(givenMonth)
+  Logger.log(datesObj);
+  let startDate = datesObj.firstDate;
+  let endDate = datesObj.lastDate;
+  let monthVal = datesObj.month;
+  if(!alreadyCallVal){
+    let formattedStartDateVal = new Date(startDate).toLocaleDateString();
+    let attendanceReportSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(`${getSheetNameByMonth(monthVal)} Leave`);
+      if (!attendanceReportSheet) {
+        // If the sheet doesn't exist, create a new one
+        attendanceReportSheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet(`${getSheetNameByMonth(monthVal)} Leave`);
+        Logger.log("Created new sheet: " + `${getSheetNameByMonth(monthVal)} Leave`);
+      }
+    const startTimeColValues = attendanceReportSheet.getRange("C:C").getValues();
+    const dateThreshold = new Date(formattedStartDateVal);
+    if(startTimeColValues[0].length){
+      // Identify rows to delete
+      let rowsToDelete = [];
+      for (let i = startTimeColValues.length - 1; i >= 1; --i) {
+        let sheetDate = new Date(startTimeColValues[i][0]).toLocaleDateString();
+        if (new Date(sheetDate) >= dateThreshold) {
+          rowsToDelete.push(i+1); // Push row numbers (1-based) to delete
+        }
+      }
+      // Delete rows in batches
+      const batchSize = 200;
+      for (let i = 0; i < rowsToDelete.length; i += batchSize) {
+        let batch = rowsToDelete.slice(i, i + batchSize);
+        attendanceReportSheet.deleteRows(batch[batch.length -1], batch.length);
+      }
+    }
+    alreadyCallVal = true;
+  }
   let apiUrl = `https://people.zoho.com/people/api/attendance/getUserReport?sdate=${startDate}&edate=${endDate}&dateFormat=yyyy-MM-dd&startIndex=${startLimit}`;
   let options = {
     "method": 'get',
@@ -30,8 +52,6 @@ function getAttendanceReport() {
   let response = UrlFetchApp.fetch(apiUrl, options);
   let results = JSON.parse(response);
   let attendanceData = results.result;
-  // Logger.log(attendanceData);
-  Logger.log(apiUrl);
   let headers = [
     ["Employee Id", "Employee Name", "Email ID", "Date", "First In", "Last Out", "Total Hours", "Early Entry", "Late Entry", "Early Exit", "Late Exit", "Net hours", "Shift Name"]
   ];
@@ -57,7 +77,7 @@ function getAttendanceReport() {
           (attendanceRecord[key]['Late_In']) ? `- ${attendanceRecord[key]['Late_In']}` : "-",
           (attendanceRecord[key]['Early_Out']) ? `- ${attendanceRecord[key]['Early_Out']}` : "-",
           (attendanceRecord[key]['Late_Out']) ? `+${attendanceRecord[key]['Late_Out']}` : "-",
-          "-",
+          netTimeDifference,
           `[${attendanceRecord[key]['ShiftStartTime']} - ${attendanceRecord[key]['ShiftEndTime']}] ${attendanceRecord[key]['ShiftName']}`,
         ];
         finalValues.push(rowArray);
@@ -65,19 +85,55 @@ function getAttendanceReport() {
     });
   });
 
-  let sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Automated attendance");
-  let lastRow = sheet.getLastRow();
+  let attendanceSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(`${getSheetNameByMonth(monthVal)} Attendance`);
+  if (!attendanceSheet) {
+    // If the sheet doesn't exist, create a new one
+    attendanceSheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet(`${getSheetNameByMonth(monthVal)} Attendance`);
+  }
+  let lastRow = attendanceSheet.getLastRow();
   let increaseLimit = 1;
   if (lastRow == 0) {
     increaseLimit = 2;
-    sheet.getRange(1, 1, headers.length, headers[0].length).setValues(headers);
+    attendanceSheet.getRange(1, 1, headers.length, headers[0].length).setValues(headers);
   }
   if(finalValues.length > 0)
-  sheet.getRange(lastRow + increaseLimit, 1, finalValues.length, finalValues[0].length).setValues(finalValues);
+  attendanceSheet.getRange(lastRow + increaseLimit, 1, finalValues.length, finalValues[0].length).setValues(finalValues);
 
   // If all records are not fetched then again call the API until all records are fetched.
   if(attendanceData.length){
     startLimit = startLimit + 100;
     getAttendanceReport();
   }
+}
+
+function createMenu() {
+  let ui = SpreadsheetApp.getUi();
+  ui.createMenu('Custom')
+    .addItem('Fetch attendance record', 'showAttendanceDialog')
+    .addSubMenu(SpreadsheetApp.getUi().createMenu('Fetch Leave record')
+          .addItem('Select month', 'showCustomDialog'))
+    .addToUi();
+}
+function onOpen(e) {
+  createMenu();
+}
+function showCustomDialog() {
+  var html = HtmlService.createHtmlOutputFromFile('Dialog')
+      .setWidth(300)
+      .setHeight(200);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Leave');
+}
+
+function processArgument(argument) {
+  getLeaveReport(parseInt(argument));
+}
+function showAttendanceDialog() {
+  var html = HtmlService.createHtmlOutputFromFile('AttendanceDialog')
+      .setWidth(300)
+      .setHeight(200);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Attendance');
+}
+
+function processAttendanceArgument(argument) {
+  getAttendanceReport(parseInt(argument));
 }

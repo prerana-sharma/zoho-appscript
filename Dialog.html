@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+  </head>
+  <body>
+    <form id="myForm">
+      <label for="argument">Month Number(of Current year):</label>
+      <input type="text" id="argument" name="argument">
+      <br><br>
+      <input type="button" value="Submit" onclick="submitForm()">
+    </form>
+
+    <script>
+      function submitForm() {
+        var argument = document.getElementById('argument').value;
+        google.script.run.processArgument(argument);
+        google.script.host.close();
+      }
+    </script>
+  </body>
+</html>
