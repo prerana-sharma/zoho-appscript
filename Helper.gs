@@ -152,3 +152,22 @@ function getSheetNameByMonth(month){
       return "Invalid month";
   }
 }
+
+function clearSheetRows(startTimeColValues, dateThreshold, attendanceReportSheet){
+  if(startTimeColValues[0].length){
+      // Identify rows to delete
+      let rowsToDelete = [];
+      for (let i = startTimeColValues.length - 1; i >= 1; --i) {
+        let sheetDate = new Date(startTimeColValues[i][0]).toLocaleDateString();
+        if (new Date(sheetDate) >= dateThreshold) {
+          rowsToDelete.push(i+1); // Push row numbers (1-based) to delete
+        }
+      }
+      // Delete rows in batches
+      const batchSize = 200;
+      for (let i = 0; i < rowsToDelete.length; i += batchSize) {
+        let batch = rowsToDelete.slice(i, i + batchSize);
+        attendanceReportSheet.deleteRows(batch[batch.length -1], batch.length);
+      }
+    }
+}

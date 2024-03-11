@@ -13,32 +13,17 @@ function getAttendanceReport(month) {
   let startDate = datesObj.firstDate;
   let endDate = datesObj.lastDate;
   let monthVal = datesObj.month;
+  let attendanceReportSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(`${getSheetNameByMonth(monthVal)} Attendance`);
+  if (!attendanceReportSheet) {
+    // If the sheet doesn't exist, create a new one
+    attendanceReportSheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet(`${getSheetNameByMonth(monthVal)} Attendance`);
+    Logger.log("Created new sheet: " + `${getSheetNameByMonth(monthVal)} Attendance`);
+  }
   if(!alreadyCallVal){
     let formattedStartDateVal = new Date(startDate).toLocaleDateString();
-    let attendanceReportSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(`${getSheetNameByMonth(monthVal)} Leave`);
-      if (!attendanceReportSheet) {
-        // If the sheet doesn't exist, create a new one
-        attendanceReportSheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet(`${getSheetNameByMonth(monthVal)} Leave`);
-        Logger.log("Created new sheet: " + `${getSheetNameByMonth(monthVal)} Leave`);
-      }
-    const startTimeColValues = attendanceReportSheet.getRange("C:C").getValues();
+    const startTimeColValues = attendanceReportSheet.getRange("D:D").getValues();
     const dateThreshold = new Date(formattedStartDateVal);
-    if(startTimeColValues[0].length){
-      // Identify rows to delete
-      let rowsToDelete = [];
-      for (let i = startTimeColValues.length - 1; i >= 1; --i) {
-        let sheetDate = new Date(startTimeColValues[i][0]).toLocaleDateString();
-        if (new Date(sheetDate) >= dateThreshold) {
-          rowsToDelete.push(i+1); // Push row numbers (1-based) to delete
-        }
-      }
-      // Delete rows in batches
-      const batchSize = 200;
-      for (let i = 0; i < rowsToDelete.length; i += batchSize) {
-        let batch = rowsToDelete.slice(i, i + batchSize);
-        attendanceReportSheet.deleteRows(batch[batch.length -1], batch.length);
-      }
-    }
+    clearSheetRows(startTimeColValues, dateThreshold, attendanceReportSheet);
     alreadyCallVal = true;
   }
   let apiUrl = `https://people.zoho.com/people/api/attendance/getUserReport?sdate=${startDate}&edate=${endDate}&dateFormat=yyyy-MM-dd&startIndex=${startLimit}`;
@@ -84,20 +69,14 @@ function getAttendanceReport(month) {
       }
     });
   });
-
-  let attendanceSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(`${getSheetNameByMonth(monthVal)} Attendance`);
-  if (!attendanceSheet) {
-    // If the sheet doesn't exist, create a new one
-    attendanceSheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet(`${getSheetNameByMonth(monthVal)} Attendance`);
-  }
-  let lastRow = attendanceSheet.getLastRow();
+  let lastRow = attendanceReportSheet.getLastRow();
   let increaseLimit = 1;
   if (lastRow == 0) {
     increaseLimit = 2;
-    attendanceSheet.getRange(1, 1, headers.length, headers[0].length).setValues(headers);
+    attendanceReportSheet.getRange(1, 1, headers.length, headers[0].length).setValues(headers);
   }
   if(finalValues.length > 0)
-  attendanceSheet.getRange(lastRow + increaseLimit, 1, finalValues.length, finalValues[0].length).setValues(finalValues);
+  attendanceReportSheet.getRange(lastRow + increaseLimit, 1, finalValues.length, finalValues[0].length).setValues(finalValues);
 
   // If all records are not fetched then again call the API until all records are fetched.
   if(attendanceData.length){
