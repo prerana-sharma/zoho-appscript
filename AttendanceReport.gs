@@ -13,11 +13,12 @@ function getAttendanceReport(month) {
   let startDate = datesObj.firstDate;
   let endDate = datesObj.lastDate;
   let monthVal = datesObj.month;
-  let attendanceReportSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(`${getSheetNameByMonth(monthVal)} Attendance`);
+  let sheetNaem = `${getSheetNameByMonth(monthVal)} Attendance`
+  let attendanceReportSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetNaem);
   if (!attendanceReportSheet) {
     // If the sheet doesn't exist, create a new one
-    attendanceReportSheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet(`${getSheetNameByMonth(monthVal)} Attendance`);
-    Logger.log("Created new sheet: " + `${getSheetNameByMonth(monthVal)} Attendance`);
+    attendanceReportSheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet(sheetNaem);
+    Logger.log("Created new sheet: " + sheetNaem);
   }
   if(!alreadyCallVal){
     let formattedStartDateVal = new Date(startDate).toLocaleDateString();
